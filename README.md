@@ -1,32 +1,55 @@
-# React + TypeScript + Vite
+# CHDC Full-Stack Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+This repository contains the React/Vite portal in `frontend/` and the Django REST API in `backend/`.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js and npm
+- Python 3.12 or newer
 
-## React Compiler
+## Setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Create the root environment file and update its values as needed:
 
-## Expanding the Oxlint configuration
+   ```sh
+   cp .env.example .env
+   ```
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+   `VITE_API_BASE_URL` should point to the Django API, normally `http://localhost:8000/api/v1`.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+2. Set up and install backend dependencies:
+
+   ```sh
+   python -m venv backend/.venv
+   source backend/.venv/bin/activate
+   python -m pip install -r backend/requirements.txt
+   ```
+
+   On Windows PowerShell, activate with `backend\.venv\Scripts\Activate.ps1`.
+
+3. Install frontend and root orchestration dependencies:
+
+   ```sh
+   npm install
+   npm --prefix frontend install
+   ```
+
+4. Apply Django migrations:
+
+   ```sh
+   python backend/manage.py migrate
+   ```
+
+## Run
+
+Activate `backend/.venv` first, then start both development servers from the repository root:
+
+```sh
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+The portal is available at `http://localhost:5173/`; the API is at `http://localhost:8000/`.
+
+Start only one service with `npm run dev:frontend` or `npm run dev:backend`.
+
+The frontend is configured to load environment values from this repository root. Django loads the same root `.env`. The SQLite database is stored at `backend/db.sqlite3` and is ignored by Git.

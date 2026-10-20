@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import axios from 'axios'
+import { parsePhoneNumberFromString } from 'libphonenumber-js'
+import { registerStudent, type APIResponse } from './services/api'
 import {
   ArrowRight,
   Check,
@@ -21,13 +23,6 @@ export interface RegisterFormData {
   matricNumber: string
   password: string
   confirmPassword: string
-}
-
-export interface APIResponse {
-  status: 'success' | 'error'
-  message: string
-  data?: { user_id: string; username: string; created_at: string }
-  errors?: Record<string, string[]>
 }
 
 type FormField = keyof RegisterFormData
@@ -57,14 +52,15 @@ function validateForm(form: RegisterFormData): FieldErrors {
   const errors: FieldErrors = {}
   if (!form.firstName.trim()) errors.firstName = 'Enter your first name.'
   if (!form.lastName.trim()) errors.lastName = 'Enter your last name.'
-  if (!/^\+234[0-9]{10}$/.test(form.mobileNumber)) {
-    errors.mobileNumber = 'Use the Nigerian format +2348012345678.'
+  const phoneNumber = parsePhoneNumberFromString(form.mobileNumber)
+  if (!phoneNumber?.isValid()) {
+    errors.mobileNumber = 'Enter a valid number, starting with 0 for Nigeria or + and your country code.'
   }
-  if (!/^UG\d{2}\/[A-Z]{2,4}\/\d{4}$/i.test(form.matricNumber.trim())) {
-    errors.matricNumber = 'Enter a valid number, e.g. UG19/CS/1042.'
+  if (!/^U\d{2}[A-Z]{2}\d{4}$/i.test(form.matricNumber.trim())) {
+    errors.matricNumber = 'Enter a valid number, e.g. U21CO1234.'
   }
-  if (form.password.length < 8 || !/[A-Z]/.test(form.password) || !/[0-9]/.test(form.password)) {
-    errors.password = 'Use 8+ characters with at least one uppercase letter and one number.'
+  if (form.password.length < 8 || !/[A-Z]/.test(form.password) || !/[0-9]/.test(form.password) || !/[^A-Za-z0-9]/.test(form.password)) {
+    errors.password = 'Use 8+ characters with an uppercase letter, a number, and a special character.'
   }
   if (!form.confirmPassword || form.password !== form.confirmPassword) {
     errors.confirmPassword = 'Passwords must match.'
@@ -156,11 +152,13 @@ export default function RegisterForm() {
 
   const validationErrors = validateForm(form)
   const isValid = Object.keys(validationErrors).length === 0
-  const matricIsValid = /^UG\d{2}\/[A-Z]{2,4}\/\d{4}$/i.test(form.matricNumber.trim())
+  const matricIsValid = /^U\d{2}[A-Z]{2}\d{4}$/i.test(form.matricNumber.trim())
+  const parsedPhoneNumber = parsePhoneNumberFromString(form.mobileNumber)
   const passwordChecks = [
     { label: '8+ characters', passed: form.password.length >= 8 },
     { label: 'One uppercase letter', passed: /[A-Z]/.test(form.password) },
     { label: 'One number', passed: /[0-9]/.test(form.password) },
+    { label: 'One special character', passed: /[^A-Za-z0-9]/.test(form.password) },
   ]
 
   useEffect(() => {
@@ -174,9 +172,18 @@ export default function RegisterForm() {
   }, [registeredUser])
 
   function updateField(field: FormField, value: string) {
-    setForm((current) => ({ ...current, [field]: value }))
+    const normalizedValue = field === 'mobileNumber' ? normalizeMobileNumber(value) : value
+    setForm((current) => ({ ...current, [field]: normalizedValue }))
     setServerErrors((current) => ({ ...current, [field]: undefined }))
     setNotice('')
+  }
+
+  function normalizeMobileNumber(value: string) {
+    const compact = value.replace(/[\s()-]/g, '')
+    if (/^0\d*$/.test(compact)) return `+234${compact.slice(1)}`
+    if (/^00\d*$/.test(compact)) return `+${compact.slice(2)}`
+    if (/^234\d*$/.test(compact)) return `+${compact}`
+    return compact
   }
 
   function fieldError(field: FormField) {
@@ -199,19 +206,14 @@ export default function RegisterForm() {
 
     setIsSubmitting(true)
     try {
-      const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
-      const response = await axios.post<APIResponse>(
-        `${baseUrl}/api/v1/auth/register/`,
-        {
-          first_name: form.firstName.trim(),
-          last_name: form.lastName.trim(),
-          mobile_number: form.mobileNumber,
-          matric_number: form.matricNumber.trim().toUpperCase(),
-          password: form.password,
-          confirm_password: form.confirmPassword,
-        },
-        { headers: { 'Content-Type': 'application/json' } },
-      )
+      const response = await registerStudent({
+        first_name: form.firstName.trim(),
+        last_name: form.lastName.trim(),
+        mobile_number: form.mobileNumber,
+        matric_number: form.matricNumber.trim().toUpperCase(),
+        password: form.password,
+        confirm_password: form.confirmPassword,
+      })
 
       if (response.status === 201 && response.data.status === 'success') {
         setRegisteredUser(response.data.data?.username || form.matricNumber.trim().toUpperCase())
@@ -292,17 +294,17 @@ export default function RegisterForm() {
 
             <form className="space-y-5 px-5 py-6 sm:px-8 sm:py-7" onSubmit={handleSubmit} noValidate>
               <div className="grid gap-4 sm:grid-cols-2">
-                <TextField id="firstName" label="First name" value={form.firstName} placeholder="e.g. Ada" autoComplete="given-name" icon={<UserRound size={17} />} onChange={(value) => updateField('firstName', value)} onBlur={() => setTouched((current) => ({ ...current, firstName: true }))} error={fieldError('firstName')} />
-                <TextField id="lastName" label="Last name" value={form.lastName} placeholder="e.g. Okafor" autoComplete="family-name" icon={<UserRound size={17} />} onChange={(value) => updateField('lastName', value)} onBlur={() => setTouched((current) => ({ ...current, lastName: true }))} error={fieldError('lastName')} />
+                <TextField id="firstName" label="First name" value={form.firstName} placeholder="Auwal" autoComplete="given-name" icon={<UserRound size={17} />} onChange={(value) => updateField('firstName', value)} onBlur={() => setTouched((current) => ({ ...current, firstName: true }))} error={fieldError('firstName')} />
+                <TextField id="lastName" label="Last name" value={form.lastName} placeholder="Usman" autoComplete="family-name" icon={<UserRound size={17} />} onChange={(value) => updateField('lastName', value)} onBlur={() => setTouched((current) => ({ ...current, lastName: true }))} error={fieldError('lastName')} />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <TextField id="mobileNumber" label="Mobile number" value={form.mobileNumber} placeholder="+2348012345678" autoComplete="tel" inputMode="tel" maxLength={14} icon={<Smartphone size={17} />} onChange={(value) => updateField('mobileNumber', value.replace(/\s/g, ''))} onBlur={() => setTouched((current) => ({ ...current, mobileNumber: true }))} error={fieldError('mobileNumber')} hint="Nigerian number with country code" />
-                <TextField id="matricNumber" label="Matriculation number" value={form.matricNumber} placeholder="UG19/CS/1042" autoComplete="username" maxLength={14} icon={<Fingerprint size={17} />} suffix={form.matricNumber && matricIsValid ? <CheckCircle2 className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600" size={18} aria-label="Valid matriculation number" /> : undefined} onChange={(value) => updateField('matricNumber', value)} onBlur={() => setTouched((current) => ({ ...current, matricNumber: true }))} error={fieldError('matricNumber')} hint={!fieldError('matricNumber') && form.matricNumber && !matricIsValid ? <span className="text-rose-700">Use the format UG19/CS/1042.</span> : 'Your matric number will be your login username.'} />
+                <TextField id="mobileNumber" label="Mobile number" value={form.mobileNumber} placeholder="08012345678" autoComplete="tel" inputMode="tel" maxLength={16} icon={<Smartphone size={17} />} onChange={(value) => updateField('mobileNumber', value)} onBlur={() => setTouched((current) => ({ ...current, mobileNumber: true }))} error={fieldError('mobileNumber')} hint={parsedPhoneNumber ? `Detected country code +${parsedPhoneNumber.countryCallingCode}.` : 'Country code is detected automatically. For Nigeria, start with 0.'} />
+                <TextField id="matricNumber" label="Matriculation number" value={form.matricNumber} placeholder="U21CO1234" autoComplete="username" maxLength={9} icon={<Fingerprint size={17} />} suffix={form.matricNumber && matricIsValid ? <CheckCircle2 className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-emerald-600" size={18} aria-label="Valid matriculation number" /> : undefined} onChange={(value) => updateField('matricNumber', value)} onBlur={() => setTouched((current) => ({ ...current, matricNumber: true }))} error={fieldError('matricNumber')} hint={!fieldError('matricNumber') && form.matricNumber && !matricIsValid ? <span className="text-rose-700">Use the format U21CO1234.</span> : 'Your matric number will be your login username.'} />
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <TextField id="password" label="Password" value={form.password} placeholder="Create a password" autoComplete="new-password" type={showPassword ? 'text' : 'password'} icon={<LockKeyhole size={17} />} suffix={<button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-teal-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>} onChange={(value) => updateField('password', value)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} error={fieldError('password')} hint={form.password ? <span className="flex flex-wrap gap-x-3 gap-y-1">{passwordChecks.map((check) => <span key={check.label} className={check.passed ? 'text-emerald-700' : 'text-slate-500'}>{check.passed ? <Check size={12} className="mr-0.5 inline" /> : null}{check.label}</span>)}</span> : '8+ characters, one uppercase letter and one number'} />
+                <TextField id="password" label="Password" value={form.password} placeholder="Create a strong password" autoComplete="new-password" type={showPassword ? 'text' : 'password'} icon={<LockKeyhole size={17} />} suffix={<button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-teal-600" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>} onChange={(value) => updateField('password', value)} onBlur={() => setTouched((current) => ({ ...current, password: true }))} error={fieldError('password')} hint={form.password ? <span className="flex flex-wrap gap-x-3 gap-y-1">{passwordChecks.map((check) => <span key={check.label} className={check.passed ? 'text-emerald-700' : 'text-slate-500'}>{check.passed ? <Check size={12} className="mr-0.5 inline" /> : null}{check.label}</span>)}</span> : '8+ characters, uppercase letter, number, and special character'} />
                 <TextField id="confirmPassword" label="Confirm password" value={form.confirmPassword} placeholder="Re-enter password" autoComplete="new-password" type={showConfirmPassword ? 'text' : 'password'} icon={<LockKeyhole size={17} />} suffix={<button type="button" onClick={() => setShowConfirmPassword((current) => !current)} className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800 focus-visible:outline-2 focus-visible:outline-teal-600" aria-label={showConfirmPassword ? 'Hide confirmation password' : 'Show confirmation password'}>{showConfirmPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button>} onChange={(value) => updateField('confirmPassword', value)} onBlur={() => setTouched((current) => ({ ...current, confirmPassword: true }))} error={fieldError('confirmPassword')} hint={form.confirmPassword && form.password === form.confirmPassword ? <span className="text-emerald-700">Passwords match.</span> : undefined} />
               </div>
 
