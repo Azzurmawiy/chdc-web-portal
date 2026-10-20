@@ -1,0 +1,86 @@
+@import 'tailwindcss';
+
+:root {
+  font-family: 'DM Sans', 'Avenir Next', Avenir, sans-serif;
+  color: #0f172a;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  background: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.portal-bg {
+  background-color: #0f172a;
+  background-image:
+    radial-gradient(ellipse at 10% 14%, rgb(13 148 136 / 16%), transparent 35%),
+    radial-gradient(ellipse at 88% 82%, rgb(14 116 144 / 14%), transparent 32%),
+    linear-gradient(135deg, #0b1220 0%, #111c2d 52%, #0b1721 100%);
+}
+
+.privacy-pulse::before {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 9999px;
+  background: #6ee7b7;
+  box-shadow: 0 0 0 0 rgb(110 231 183 / 45%);
+  content: '';
+  animation: privacy-pulse 2.2s ease-out infinite;
+}
+
+.success-dialog {
+  animation: dialog-enter 180ms ease-out both;
+}
+
+@keyframes privacy-pulse {
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgb(110 231 183 / 0%);
+  }
+}
+
+@keyframes dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
